@@ -1,0 +1,201 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  USER
+  ADMIN
+  AUTHOR
+}
+
+enum ContentStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum ContactStatus {
+  NEW
+  READ
+  ARCHIVED
+}
+
+enum CategorySection {
+  ARTICLE
+  VIDEO
+  BOTH
+}
+
+model User {
+  id                         String    @id @default(cuid())
+  name                       String
+  email                      String    @unique
+  passwordHash               String
+  role                       Role      @default(USER)
+  emailVerifiedAt            DateTime?
+  emailVerificationTokenHash String?   @unique
+  emailVerificationExpiresAt DateTime?
+  passwordResetTokenHash     String?   @unique
+  passwordResetExpiresAt     DateTime?
+  bio                        String?   @db.VarChar(500)
+  avatarUrl                  String?
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
+
+  news     News[]
+  videos   Video[]
+  media    Media[]
+  comments Comment[]
+}
+
+model Comment {
+  id   String @id @default(cuid())
+  body String @db.VarChar(2000)
+
+  // Moderation: PENDING (waiting for admin) | APPROVED (visible on site) | REJECTED
+  status String @default("PENDING")
+
+  createdAt DateTime @default(now())
+
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  newsId String?
+  news   News?   @relation(fields: [newsId], references: [id], onDelete: Cascade)
+
+  videoId String?
+  video   Video?  @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@index([newsId, createdAt])
+  @@index([videoId, createdAt])
+  @@index([authorId, createdAt])
+  @@index([status, createdAt])
+}
+
+// ---------- دسته‌بندی ----------
+model Category {
+  id        String          @id @default(cuid())
+  name      String
+  slug      String          @unique
+  section   CategorySection @default(BOTH)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  news   News[]
+  videos Video[]
+
+  @@index([section])
+}
+
+model Media {
+  id         String   @id @default(cuid())
+  url        String
+  mimeType   String
+  fileSize   Int?
+  width      Int?
+  height     Int?
+  alt        String   @default("")
+  credit     String?
+  uploaderId String?
+  uploader   User?    @relation(fields: [uploaderId], references: [id], onDelete: SetNull)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  newsCovers  News[]  @relation("NewsCover")
+  videoFiles  Video[] @relation("VideoFile")
+  videoThumbs Video[] @relation("VideoThumbnail")
+}
+
+model News {
+  id              String        @id @default(cuid())
+  title           String
+  slug            String        @unique
+  excerpt         String
+  content         Json
+  coverId         String?
+  cover           Media?        @relation("NewsCover", fields: [coverId], references: [id], onDelete: SetNull)
+  coverUrl        String?
+  categoryId      String
+  category        Category      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  authorId        String?
+  author          User?         @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  authorName      String?
+  status          ContentStatus @default(DRAFT)
+  publishedAt     DateTime      @default(now())
+  isBreaking      Boolean       @default(false)
+  featured        Boolean       @default(false)
+  views           Int           @default(0)
+  tags            String[]      @default([])
+  metaTitle       String?
+  metaDescription String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  comments        Comment[]
+
+  @@index([status, publishedAt])
+  @@index([categoryId, publishedAt])
+  @@index([views])
+}
+
+model Video {
+  id              String        @id @default(cuid())
+  title           String
+  slug            String        @unique
+  description     String
+  videoUrl        String?
+  videoFileId     String?
+  videoFile       Media?        @relation("VideoFile", fields: [videoFileId], references: [id], onDelete: SetNull)
+  thumbnailId     String?
+  thumbnail       Media?        @relation("VideoThumbnail", fields: [thumbnailId], references: [id], onDelete: SetNull)
+  thumbnailUrl    String?
+  duration        String
+  categoryId      String
+  category        Category      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  authorId        String?
+  author          User?         @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  status          ContentStatus @default(DRAFT)
+  publishedAt     DateTime      @default(now())
+  isLive          Boolean       @default(false)
+  featured        Boolean       @default(false)
+  views           Int           @default(0)
+  tags            String[]      @default([])
+  metaTitle       String?
+  metaDescription String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  comments        Comment[]
+
+  @@index([status, publishedAt])
+  @@index([categoryId, publishedAt])
+  @@index([views])
+}
+
+model Contact {
+  id        String        @id @default(cuid())
+  name      String
+  email     String
+  phone     String?
+  subject   String
+  message   String
+  status    ContactStatus @default(NEW)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
+
+model Subscriber {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model Setting {
+  id        String   @id @default(cuid())
+  key       String   @unique // e.g. "site" → { title, description, socials, ... }
+  value     Json
+  updatedAt DateTime @updatedAt
+}

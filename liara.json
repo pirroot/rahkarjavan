@@ -1,0 +1,7 @@
+{
+  "app": "rahkarjavan",
+  "platform": "next",
+  "port": 3000,
+  "buildCommand": "npx prisma@7.10.0 generate && next build",
+  "postDeployCommand": "npx prisma@7.10.0 migrate deploy"
+}
